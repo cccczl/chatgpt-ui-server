@@ -76,8 +76,7 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Message.objects.filter(user=self.request.user).order_by('-created_at')
-        conversationId = self.request.query_params.get('conversationId')
-        if conversationId:
+        if conversationId := self.request.query_params.get('conversationId'):
             queryset = queryset.filter(conversation_id=conversationId).order_by('created_at')
             return queryset
         return queryset
@@ -135,8 +134,7 @@ class EmbeddingDocumentViewSet(viewsets.ModelViewSet):
             openai_api_key = get_api_key_from_setting()
 
         if openai_api_key is None:
-            api_key = get_api_key()
-            if api_key:
+            if api_key := get_api_key():
                 openai_api_key = api_key.key
             else:
                 return Response(
@@ -158,10 +156,7 @@ class EmbeddingDocumentViewSet(viewsets.ModelViewSet):
         logger.debug('user %s upload a file %s %s', self.request.user, file_mime, self.request.data['title'])
 
         with tempfile.TemporaryDirectory() as tmpdirname:
-            if 'text/' in file_mime:
-                mode = 'w'
-            else:
-                mode = 'wb'
+            mode = 'w' if 'text/' in file_mime else 'wb'
             dump_basename = 'fh' + str(uuid.uuid4()).replace('-', '')
             dump_name = os.path.join(tmpdirname, dump_basename)
             with open(dump_name, mode) as f:
@@ -282,7 +277,6 @@ def gen_title(request):
 
 
 @api_view(['POST'])
-# @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def upload_conversations(request):
     """allow user to import a list of conversations"""
@@ -297,11 +291,9 @@ def upload_conversations(request):
             topic = conversation.get('conversation_topic', None)
             messages = []
             for message in conversation.get('messages'):
-                msg = {}
-                msg['role'] = message['role']
-                msg['content'] = message['content']
+                msg = {'role': message['role'], 'content': message['content']}
                 messages.append(msg)
-            if len(messages) > 0:
+            if messages:
                 conversations.append({
                     'topic': topic,
                     'messages': messages,
@@ -340,13 +332,12 @@ def upload_conversations(request):
             {'error': import_err_msg},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
     # return a list of new conversation id
     return Response(conversation_ids)
 
 
 @api_view(['POST'])
-# @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def conversation(request):
     model_name = request.data.get('name')
@@ -368,11 +359,7 @@ def conversation(request):
     message_type = message_object.get('message_type', 0)
     tool_name = message_object.get('tool', None)
     tool_args = message_object.get('tool_args', None)
-    if tool_name:
-        tool = {'name': tool_name, 'args': tool_args}
-    else:
-        tool = None
-
+    tool = {'name': tool_name, 'args': tool_args} if tool_name else None
     logger.debug('conversation_id = %s message_objects = %s', conversation_id, message_object_list)
 
     api_key = None
@@ -545,9 +532,7 @@ def conversation(request):
         completion_text = ''
         if messages['renew']:  # if AI has read and replied this message
             for event in gen:
-                if event['status'] == 'done':
-                    pass
-                else:
+                if event['status'] != 'done':
                     text = event['content']
                     if text:
                         completion_text += str(text)
@@ -703,8 +688,7 @@ def build_messages(model, user, conversation_id, new_messages, web_search_params
                 logger.debug('get a document %s', message_content)
                 if doc_id:
                     logger.debug('get the document id %s', doc_id)
-                    doc_obj = EmbeddingDocument.objects.get(id=doc_id)
-                    if doc_obj:
+                    if doc_obj := EmbeddingDocument.objects.get(id=doc_id):
                         logger.debug('get the document obj %s %s', doc_id, doc_obj.title)
                         vector_store = unpick_faiss(doc_obj.faiss_store)
                         if faiss_store:
@@ -722,25 +706,23 @@ def build_messages(model, user, conversation_id, new_messages, web_search_params
                     result['doc_title'] = doc_title
                 else:
                     doc_id = message['embedding_message_doc']
-                if doc_id:
-                    message['embedding_message_doc'] = doc_id
-                    logger.debug('get the arxiv document id %s', doc_id)
-                    doc_obj = EmbeddingDocument.objects.get(id=doc_id)
-                    if doc_obj:
-                        logger.debug('get the document obj %s %s', doc_id, doc_obj.title)
-                        vector_store = unpick_faiss(doc_obj.faiss_store)
-                        if faiss_store:
-                            faiss_store.merge_from(vector_store)
-                        else:
-                            faiss_store = vector_store
-                        logger.debug('document obj %s %s loaded', doc_id, doc_obj.title)
-                else:
+                if not doc_id:
                     raise RuntimeError('ArXiv document failed to download or embed')
+                message['embedding_message_doc'] = doc_id
+                logger.debug('get the arxiv document id %s', doc_id)
+                if doc_obj := EmbeddingDocument.objects.get(id=doc_id):
+                    logger.debug('get the document obj %s %s', doc_id, doc_obj.title)
+                    vector_store = unpick_faiss(doc_obj.faiss_store)
+                    if faiss_store:
+                        faiss_store.merge_from(vector_store)
+                    else:
+                        faiss_store = vector_store
+                    logger.debug('document obj %s %s loaded', doc_id, doc_obj.title)
         else:
             new_message = {"role": role, "content": message_content}
             new_token_count = num_tokens_from_messages(system_messages + messages + [new_message], model['name'])
             if new_token_count > max_token_count:
-                if len(messages) > 0:
+                if messages:
                     break
                 raise ValueError(
                     f"Prompt is too long. Max token count is {max_token_count}, but prompt is {new_token_count} tokens long.")
@@ -767,9 +749,7 @@ def get_current_model(model_name, request_max_response_tokens):
 
 def get_api_key_from_setting():
     row = Setting.objects.filter(name='openai_api_key').first()
-    if row and row.value != '':
-        return row.value
-    return None
+    return row.value if row and row.value != '' else None
 
 
 def get_api_key():
@@ -830,7 +810,6 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
 
 def get_openai(openai_api_key):
     openai.api_key = openai_api_key
-    proxy = os.getenv('OPENAI_API_PROXY')
-    if proxy:
+    if proxy := os.getenv('OPENAI_API_PROXY'):
         openai.api_base = proxy
     return openai

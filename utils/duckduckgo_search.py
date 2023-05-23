@@ -6,8 +6,7 @@ from .search_abc import SearchRequest, SearchResponse, SearchResult
 import os
 proxies = None
 for key in ['DUCK_PROXY', 'http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY']:
-    value = os.getenv(key)
-    if value:
+    if value := os.getenv(key):
         proxies = {
             'http': value,
             'https': value,
