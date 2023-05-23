@@ -7,14 +7,13 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
 
-    def update_message_user(apps, schema_editor):
-        Message = apps.get_model('chat', 'message')
-        Conversation = apps.get_model('chat', 'conversation')
+    def update_message_user(self, schema_editor):
+        Message = self.get_model('chat', 'message')
+        Conversation = self.get_model('chat', 'conversation')
         for message in Message.objects.all():
             conversation_id = message.conversation_id
             conversation_obj = Conversation.objects.get(id=conversation_id)
-            user_id = conversation_obj.user_id
-            if user_id:
+            if user_id := conversation_obj.user_id:
                 #print(f'message {message.id} to user {user_id}')
                 message.user_id = user_id
                 message.save()

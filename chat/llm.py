@@ -151,8 +151,7 @@ class ChatModel:
             api_base, api_key = setup_openai_env()
             self.name = 'open_ai'
             max_response_tokens = openai_model['max_prompt_tokens']
-            if max_response_tokens > 1024:
-                max_response_tokens = 1024
+            max_response_tokens = min(max_response_tokens, 1024)
             self._model = ChatOpenAI(
                 api_key=api_key,
                 api_base=api_base,
@@ -169,16 +168,14 @@ chat_model = ChatModel()
 
 def pickle_faiss(db):
     idx = faiss.serialize_index(db.index)
-    pickled = pickle.dumps((db.docstore, db.index_to_docstore_id, idx))
-    return pickled
+    return pickle.dumps((db.docstore, db.index_to_docstore_id, idx))
 
 def unpick_faiss(pickled, embedding_func = None):
     if not embedding_func:
         embedding_func = embedding_model.function
     docstore, index_to_docstore_id, idx = pickle.loads(pickled)
     index = faiss.deserialize_index(idx)
-    db = FAISS(embedding_func.embed_query, index, docstore, index_to_docstore_id)
-    return db
+    return FAISS(embedding_func.embed_query, index, docstore, index_to_docstore_id)
 
 def get_embedding_document(file, mime):
     """return a pickled faiss vectorsotre"""
@@ -197,7 +194,7 @@ def get_embedding_document(file, mime):
     embeddings_function = embedding_model.function
 
     for doc in docs:
-        hash_str = str(hashlib.md5(str(doc).encode()).hexdigest())
+        hash_str = hashlib.md5(str(doc).encode()).hexdigest()
         doc.metadata['hash'] = hash_str  # track where chunk from
     documents = text_splitter.split_documents(docs)
     db = FAISS.from_documents(documents, embeddings_function)

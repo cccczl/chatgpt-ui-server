@@ -41,8 +41,6 @@ class Message(models.Model):
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        if self.message_type % 1000 > 100:  # remove document it attached
-            pass
         super().delete(*args, **kwargs)
 
 

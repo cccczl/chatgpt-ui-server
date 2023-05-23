@@ -24,8 +24,9 @@ def _web_search(message, args):
     '''search the web
     '''
     search_results = web_search(SearchRequest(message, ua=args['ua']), num_results=5)
-    message_content = compile_prompt(search_results, message, default_prompt=args['default_prompt'])
-    return message_content
+    return compile_prompt(
+        search_results, message, default_prompt=args['default_prompt']
+    )
 
 
 arxiv_client = arxiv.Client(
@@ -35,8 +36,7 @@ arxiv_client = arxiv.Client(
 )
 
 def _hacky_hash(some_string):
-    _hash = hashlib.md5(some_string.encode("utf-8")).hexdigest()
-    return _hash
+    return hashlib.md5(some_string.encode("utf-8")).hexdigest()
 
 def _arxiv_load(
     query: Optional[str] ='',
@@ -145,7 +145,7 @@ def _arxiv(message, args):
     from langchain.vectorstores import FAISS
 
     ID =  message.strip()
-    message = '[arxiv] ' + ID
+    message = f'[arxiv] {ID}'
 
     logger.debug('process arxiv message %s : %s', message, args)
 
